@@ -2,8 +2,7 @@ using MAT
 using Plots
 
 # Specify the path to your .mat file
-file_path = "voltage_control_data.mat"
-
+file_path = "/Users/rasiamah3/Library/CloudStorage/OneDrive-GeorgiaInstituteofTechnology/Research/Just Code/JuliaDevelopment/smart_meter_data/voltage_control_data.mat"
 # Load the data from the .mat file
 data = matread(file_path)
 
