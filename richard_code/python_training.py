@@ -7,6 +7,11 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+from sklearn.metrics import precision_score, recall_score, classification_report
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
 
 # Set random seed
 tf.random.set_seed(42)
@@ -50,7 +55,7 @@ x = np.concatenate((nodal_p, nodal_q, nodal_voltages), axis=1)
 print(x.shape)
 
 # Assuming each sample should be 96 timesteps long
-timesteps = 192
+timesteps = 96
 num_samples = x.shape[0] // timesteps  # Number of samples with 96 timesteps each
 
 x = x[:num_samples * timesteps]  # Trim the data to fit exactly into (num_samples, 96, 3)
@@ -67,7 +72,8 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 
 # Model Definition
 model = Sequential()
-model.add(Dense(100, activation='relu', input_shape=(timesteps, 3)))  # Input: (96, 3)
+model.add(Dense(10, activation='relu', input_shape=(timesteps, 3)))
+# model.add(Dense(50, activation='relu'))
 model.add(Flatten())  # Flatten the output before the final Dense layer
 model.add(Dense(4, activation='softmax')) 
 
@@ -85,9 +91,49 @@ model.fit(x_train, y_train,
           callbacks=[early_stopping])
 
 score = model.evaluate(x_test, y_test)
-predicts = model.predict(x_test)
+y_pred = model.predict(x_test)
 
-rounded_predicts = np.round(predicts)
-accuracy = np.mean(rounded_predicts == y_test)
-error = np.mean(rounded_predicts != y_test)
+y_pred = np.round(y_pred)
+accuracy = np.mean(y_pred == y_test)
+error = np.mean(y_pred != y_test)
+index = np.where(y_pred != y_test)
+print("Indices where y_pred != y_test:", index)
 print('Accuracy: {:.2f}%'.format(accuracy * 100))
+
+# Generate predictions on the test set
+y_pred_cm = np.argmax(y_pred, axis=1)
+y_test_cm = np.argmax(y_test, axis=1)
+
+# Compute the confusion matrix
+cm = confusion_matrix(y_test_cm, y_pred_cm)
+
+# Plot the confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+plt.xlabel('Predicted Labels')
+plt.ylabel('True Labels')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Calculate recall and precision
+print(classification_report(y_test, y_pred))
+precision = precision_score(y_test, y_pred, average='macro')
+recall = recall_score(y_test, y_pred, average='macro')
+print('Precision: {:.2f}'.format(precision))
+print('Recall: {:.2f}'.format(recall))
+
+# Compute the false positive rate, true positive rate, and thresholds for the roc curve
+fpr, tpr, thresholds = roc_curve(y_test[:, 1], y_pred[:, 1])
+roc_auc = auc(fpr, tpr)
+
+# Plot the roc curve
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, label='ROC curve (area = {:.2f})'.format(roc_auc))
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc='lower right')
+plt.show()
