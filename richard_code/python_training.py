@@ -47,13 +47,10 @@ nodal_p = nodal_p.reshape(48320160,1)
 nodal_q = nodal_q.reshape(48320160,1)
 
 x = np.concatenate((nodal_p, nodal_q, nodal_voltages), axis=1)
-# x= np.transpose(x)
 print(x.shape)
-# x = x.reshape(503335, 288)
-# print(x.shape)
 
 # Assuming each sample should be 96 timesteps long
-timesteps = 96
+timesteps = 192
 num_samples = x.shape[0] // timesteps  # Number of samples with 96 timesteps each
 
 x = x[:num_samples * timesteps]  # Trim the data to fit exactly into (num_samples, 96, 3)
@@ -62,24 +59,15 @@ print("New input shape:", x.shape)
 
 # One-hot encoding the target variable
 y = to_categorical(one_hot_vector)
-y = np.repeat(y, 365, axis=0)
-y = y.reshape(num_samples, 1, 4)
+y = np.repeat(y, 35040/timesteps, axis=0)
 print("New target shape:", y.shape)
-# y = np.repeat(y, 365, axis=0)
-# # y = np.repeat(y, 35040, axis=0)
-# print(y.shape)
 
 # Splitting the reshaped data
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
-# Remove the extra dimension in the target labels
-y_train = y_train.reshape(-1, 4)
-y_test = y_test.reshape(-1, 4)
 
 # Model Definition
-# Get parameters from logged hyperparameters
 model = Sequential()
-model.add(Dense(100, activation='relu', input_shape=(96, 3)))  # Input: (96, 3)
-model.add(Dropout(0.25))
+model.add(Dense(100, activation='relu', input_shape=(timesteps, 3)))  # Input: (96, 3)
 model.add(Flatten())  # Flatten the output before the final Dense layer
 model.add(Dense(4, activation='softmax')) 
 
@@ -92,7 +80,7 @@ model.compile(optimizer='adamax',
 
 model.fit(x_train, y_train,
           batch_size=50,
-          epochs=50,
+          epochs = 5,
           validation_data=(x_test, y_test),
           callbacks=[early_stopping])
 
@@ -103,5 +91,3 @@ rounded_predicts = np.round(predicts)
 accuracy = np.mean(rounded_predicts == y_test)
 error = np.mean(rounded_predicts != y_test)
 print('Accuracy: {:.2f}%'.format(accuracy * 100))
-
-
