@@ -31,6 +31,8 @@ params = {
 # Load the json file
 with open('one_hot_vector.json') as f:
     one_hot_vector = json.load(f)
+    # Subtract 1 from each element in one_hot_vector
+    one_hot_vector = [x - 1 for x in one_hot_vector]
 
 # Specify the path to your .mat file
 file_path = "/Users/rasiamah3/Library/CloudStorage/OneDrive-GeorgiaInstituteofTechnology/Research/Just Code/JuliaDevelopment/smart_meter_data/voltage_control_data.mat"
@@ -51,89 +53,117 @@ nodal_voltages = nodal_voltages.reshape(48320160,1)
 nodal_p = nodal_p.reshape(48320160,1)
 nodal_q = nodal_q.reshape(48320160,1)
 
-x = np.concatenate((nodal_p, nodal_q, nodal_voltages), axis=1)
-print(x.shape)
-
 # Assuming each sample should be 96 timesteps long
-timesteps = 96
-num_samples = x.shape[0] // timesteps  # Number of samples with 96 timesteps each
+# all_timesteps = [1, 2, 3, 4, 6, 8, 12, 16, 24, 48, 96]
+all_timesteps = [1, 48, 96]
 
-x = x[:num_samples * timesteps]  # Trim the data to fit exactly into (num_samples, 96, 3)
-x = x.reshape(num_samples, timesteps, 3)
-print("New input shape:", x.shape)
+# Plotting recall and accuracy vs timesteps
+f1_score_values = []
+accuracy_values = []
 
-# One-hot encoding the target variable
-y = to_categorical(one_hot_vector)
-y = np.repeat(y, 35040/timesteps, axis=0)
-print("New target shape:", y.shape)
+for timesteps in all_timesteps:
+    print(f"Training model with {timesteps} timesteps")
+    x = np.concatenate((nodal_p, nodal_q, nodal_voltages), axis=1)
+    print(x.shape)
+    num_samples = x.shape[0] // timesteps  # Number of samples with 96 timesteps each
 
-# Splitting the reshaped data
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+    x = x[:num_samples * timesteps]  # Trim the data to fit exactly into (num_samples, 96, 3)
+    x = x.reshape(num_samples, timesteps, 3)
+    print("New input shape:", x.shape)
 
-# Model Definition
-model = Sequential()
-model.add(Dense(10, activation='relu', input_shape=(timesteps, 3)))
-# model.add(Dense(50, activation='relu'))
-model.add(Flatten())  # Flatten the output before the final Dense layer
-model.add(Dense(4, activation='softmax')) 
+    # One-hot encoding the target variable
+    y = to_categorical(one_hot_vector)
+    y = np.repeat(y, 35040/timesteps, axis=0)
+    print("New target shape:", y.shape)
 
-loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-early_stopping = EarlyStopping(monitor='val_loss', patience=3)
+    # Splitting the reshaped data
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-model.compile(optimizer='adamax', 
-              loss=loss_fn,
-              metrics=['accuracy'])
+    # Model Definition
+    model = Sequential()
+    model.add(Dense(3*timesteps, activation='relu', input_shape=(timesteps, 3)))
+    model.add(Dense(timesteps, activation='relu'))
+    model.add(Flatten())  # Flatten the output before the final Dense layer
+    model.add(Dense(3, activation='softmax')) 
 
-model.fit(x_train, y_train,
-          batch_size=50,
-          epochs = 5,
-          validation_data=(x_test, y_test),
-          callbacks=[early_stopping])
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=3)
 
-score = model.evaluate(x_test, y_test)
-y_pred = model.predict(x_test)
+    model.compile(optimizer='adamax', 
+                loss=loss_fn,
+                metrics=['accuracy'])
 
-y_pred = np.round(y_pred)
-accuracy = np.mean(y_pred == y_test)
-error = np.mean(y_pred != y_test)
-index = np.where(y_pred != y_test)
-print("Indices where y_pred != y_test:", index)
-print('Accuracy: {:.2f}%'.format(accuracy * 100))
+    model.fit(x_train, y_train,
+            batch_size=50,
+            epochs = 5,
+            validation_data=(x_test, y_test),
+            callbacks=[early_stopping])
 
-# Generate predictions on the test set
-y_pred_cm = np.argmax(y_pred, axis=1)
-y_test_cm = np.argmax(y_test, axis=1)
+    score = model.evaluate(x_test, y_test)
+    y_pred = model.predict(x_test)
 
-# Compute the confusion matrix
-cm = confusion_matrix(y_test_cm, y_pred_cm)
+    y_pred = np.round(y_pred)
+    accuracy = np.mean(y_pred == y_test)
+    error = np.mean(y_pred != y_test)
+    index = np.where(y_pred != y_test)
+    print("Indices where y_pred != y_test:", index)
+    print('Accuracy: {:.2f}%'.format(accuracy * 100))
 
-# Plot the confusion matrix
+    # Calculate recall and precision
+    print(classification_report(y_test, y_pred))
+    precision = precision_score(y_test, y_pred, average='macro')
+    recall = recall_score(y_test, y_pred, average='macro')
+    print('Precision: {:.2f}'.format(precision))
+    print('Recall: {:.2f}'.format(recall))
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    print('F1 Score: {:.2f}'.format(f1_score))
+
+    f1_score_values.append(f1_score)
+    accuracy_values.append(accuracy)
+
+# Plotting recall vs timesteps
 plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
-plt.xlabel('Predicted Labels')
-plt.ylabel('True Labels')
-plt.title('Confusion Matrix')
+plt.plot(all_timesteps, f1_score_values, marker='o')
+plt.xlabel('Timesteps')
+plt.ylabel('Recall')
+plt.title('F1 score VS Number of Timesteps')
 plt.show()
 
-# Calculate recall and precision
-print(classification_report(y_test, y_pred))
-precision = precision_score(y_test, y_pred, average='macro')
-recall = recall_score(y_test, y_pred, average='macro')
-print('Precision: {:.2f}'.format(precision))
-print('Recall: {:.2f}'.format(recall))
-
-# Compute the false positive rate, true positive rate, and thresholds for the roc curve
-fpr, tpr, thresholds = roc_curve(y_test[:, 1], y_pred[:, 1])
-roc_auc = auc(fpr, tpr)
-
-# Plot the roc curve
+# Plotting accuracy vs timesteps
 plt.figure(figsize=(8, 6))
-plt.plot(fpr, tpr, label='ROC curve (area = {:.2f})'.format(roc_auc))
-plt.plot([0, 1], [0, 1], 'k--')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Receiver Operating Characteristic')
-plt.legend(loc='lower right')
+plt.plot(all_timesteps, accuracy_values, marker='o')
+plt.xlabel('Timesteps')
+plt.ylabel('Accuracy')
+plt.title('Accuracy VS Number of Timesteps')
 plt.show()
+
+
+
+        
+# # Generate predictions on the test set
+# y_pred_cm = np.argmax(y_pred, axis=1)
+# y_test_cm = np.argmax(y_test, axis=1)
+# # Compute the confusion matrix
+# cm = confusion_matrix(y_test_cm, y_pred_cm)
+# # Plot the confusion matrix
+# plt.figure(figsize=(8, 6))
+# sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+# plt.xlabel('Predicted Labels')
+# plt.ylabel('True Labels')
+# plt.title('Confusion Matrix')
+# plt.show()
+
+# # Compute the false positive rate, true positive rate, and thresholds for the roc curve
+# fpr, tpr, thresholds = roc_curve(y_test[:, 1], y_pred[:, 1])
+# roc_auc = auc(fpr, tpr)
+# # Plot the roc curve
+# plt.figure(figsize=(8, 6))
+# plt.plot(fpr, tpr, label='ROC curve (area = {:.2f})'.format(roc_auc))
+# plt.plot([0, 1], [0, 1], 'k--')
+# plt.xlim([0.0, 1.0])
+# plt.ylim([0.0, 1.05])
+# plt.xlabel('False Positive Rate')
+# plt.ylabel('True Positive Rate')
+# plt.title('Receiver Operating Characteristic')
+# plt.legend(loc='lower right')
+# plt.show()
