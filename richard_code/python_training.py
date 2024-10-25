@@ -11,6 +11,7 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 from sklearn.metrics import precision_score, recall_score, classification_report
 from sklearn.metrics import roc_curve, auc
+import h5py
 import matplotlib.pyplot as plt
 
 # Set random seed
@@ -54,8 +55,7 @@ nodal_p = nodal_p.reshape(48320160,1)
 nodal_q = nodal_q.reshape(48320160,1)
 
 # Assuming each sample should be 96 timesteps long
-# all_timesteps = [1, 2, 3, 4, 6, 8, 12, 16, 24, 48, 96]
-all_timesteps = [1, 48, 96]
+all_timesteps = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 96]
 
 # Plotting recall and accuracy vs timesteps
 f1_score_values = []
@@ -71,6 +71,10 @@ for timesteps in all_timesteps:
     x = x.reshape(num_samples, timesteps, 3)
     print("New input shape:", x.shape)
 
+    # Data augmentation for x_test
+    noise_factor = 0.1
+    x_test = x_test + np.random.normal(loc=0.0, scale=noise_factor, size=x_test.shape)
+
     # One-hot encoding the target variable
     y = to_categorical(one_hot_vector)
     y = np.repeat(y, 35040/timesteps, axis=0)
@@ -81,7 +85,7 @@ for timesteps in all_timesteps:
 
     # Model Definition
     model = Sequential()
-    model.add(Dense(3*timesteps, activation='relu', input_shape=(timesteps, 3)))
+    model.add(Dense(3 * timesteps, activation='relu', input_shape=(timesteps, 3)))
     model.add(Dense(timesteps, activation='relu'))
     model.add(Flatten())  # Flatten the output before the final Dense layer
     model.add(Dense(3, activation='softmax')) 
@@ -94,39 +98,42 @@ for timesteps in all_timesteps:
                 metrics=['accuracy'])
 
     model.fit(x_train, y_train,
-            batch_size=50,
-            epochs = 5,
+            batch_size=25,
+            epochs = 50,
             validation_data=(x_test, y_test),
             callbacks=[early_stopping])
 
+    # Save the trained model
+    model.save(f'model_{timesteps}.h5')
     score = model.evaluate(x_test, y_test)
-    y_pred = model.predict(x_test)
 
+    # Generate predictions on the test set
+    y_pred = model.predict(x_test)
     y_pred = np.round(y_pred)
     accuracy = np.mean(y_pred == y_test)
-    error = np.mean(y_pred != y_test)
-    index = np.where(y_pred != y_test)
-    print("Indices where y_pred != y_test:", index)
     print('Accuracy: {:.2f}%'.format(accuracy * 100))
 
     # Calculate recall and precision
     print(classification_report(y_test, y_pred))
     precision = precision_score(y_test, y_pred, average='macro')
     recall = recall_score(y_test, y_pred, average='macro')
-    print('Precision: {:.2f}'.format(precision))
-    print('Recall: {:.2f}'.format(recall))
     f1_score = 2 * (precision * recall) / (precision + recall)
     print('F1 Score: {:.2f}'.format(f1_score))
 
     f1_score_values.append(f1_score)
     accuracy_values.append(accuracy)
 
+# Save the vectors f1 and accuracy
+np.save('f1_score_values.npy', f1_score_values)
+np.save('accuracy_values.npy', accuracy_values)
+
 # Plotting recall vs timesteps
 plt.figure(figsize=(8, 6))
 plt.plot(all_timesteps, f1_score_values, marker='o')
 plt.xlabel('Timesteps')
-plt.ylabel('Recall')
+plt.ylabel('F1 Score')
 plt.title('F1 score VS Number of Timesteps')
+plt.savefig('F1_score_vs_timesteps.png')
 plt.show()
 
 # Plotting accuracy vs timesteps
@@ -135,6 +142,7 @@ plt.plot(all_timesteps, accuracy_values, marker='o')
 plt.xlabel('Timesteps')
 plt.ylabel('Accuracy')
 plt.title('Accuracy VS Number of Timesteps')
+plt.savefig('accuracy_vs_timesteps.png')
 plt.show()
 
 
