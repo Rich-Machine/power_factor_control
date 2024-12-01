@@ -45,9 +45,11 @@ avg_p_no = []
 avg_q_no = []
 normalized_p = p[:, no_control] ./ maximum(p[:, no_control])
 normalized_q = q[:, no_control] ./ maximum(p[:, no_control])
-for i in  1:96
-    push!(avg_p_no, mean(normalized_p[i, :]))
-    push!(avg_q_no, mean(normalized_q[i, :]))
+for i in 1:96
+    sum_p = sum(sum(normalized_p[96 * (day - 1) + i, j] for day in 1:365) for j in size(no_control))
+    sum_q = sum(sum(normalized_q[96 * (day - 1) + i, j] for day in 1:365) for j in size(no_control))
+    push!(avg_p_no, sum_p/length(no_control))
+    push!(avg_q_no, sum_q/length(no_control))
 end
 avg_p_no = convert(Vector{Float64}, avg_p_no)
 avg_q_no = convert(Vector{Float64}, avg_q_no)
@@ -60,8 +62,10 @@ avg_q_pf = []
 normalized_p = p[:, pf_control] ./ maximum(p[:, pf_control])
 normalized_q = q[:, pf_control] ./ maximum(p[:, pf_control])
 for i in 1:96
-    push!(avg_p_pf, mean(normalized_p[i, :]))
-    push!(avg_q_pf, mean(normalized_q[i, :]))
+    sum_p = sum(sum(normalized_p[96 * (day - 1) + i, j] for day in 1:365) for j in size(pf_control))
+    sum_q = sum(sum(normalized_q[96 * (day - 1) + i, j] for day in 1:365) for j in size(pf_control))
+    push!(avg_p_pf, sum_p/length(pf_control))
+    push!(avg_q_pf, sum_q/length(pf_control))
 end
 avg_p_pf = convert(Vector{Float64}, avg_p_pf)
 avg_q_pf = convert(Vector{Float64}, avg_q_pf)
@@ -74,20 +78,16 @@ avg_q_vv = []
 normalized_p = p[:, vv_control] ./ maximum(p[:, vv_control])
 normalized_q = q[:, vv_control] ./ maximum(p[:, vv_control])
 for i in 1:96
-    push!(avg_p_vv, mean(normalized_p[i, :]))
-    push!(avg_q_vv, mean(normalized_q[i, :]))
+    sum_p = sum(sum(normalized_p[96 * (day - 1) + i, j] for day in 1:365) for j in size(vv_control))
+    sum_q = sum(sum(normalized_q[96 * (day - 1) + i, j] for day in 1:365) for j in size(vv_control))
+    push!(avg_p_vv, sum_p/length(vv_control))
+    push!(avg_q_vv, sum_q/length(vv_control))
 end
 avg_p_vv = convert(Vector{Float64}, avg_p_vv)
 avg_q_vv = convert(Vector{Float64}, avg_q_vv)
 plt = plot(1:96, avg_p_vv, label="Average Real Power", xlabel="Time (15-min intervals)", ylabel="Power (kW)", title="Waveform for Volt-Var Control")
 plt = plot!(1:96, avg_q_vv, label="Average Reactive Power")
 display(plt)
-
-normalized_values = p[1:96, 10] ./ maximum(p[1:96, 10]) 
-dist = euclidean(normalized_values, avg_p_no)
-
-display(plot)
-
 
 for j in 1:1379
     index = 1
@@ -121,10 +121,10 @@ for load in 1101:1379
     vv_control_number = 0
     for day in 1:365
         # ## Adding noise to the testing dataset.
-        for i in 1:96
-            p[96 * (day - 1) + i, load] = p[96 * (day - 1) + i, load] .+ rand(-1:1) .* (0.05 * mean(p[96 * (day - 1) + i, load]))
-            q[96 * (day - 1) + i, load] = q[96 * (day - 1) + i, load] .+ rand(-1:1) .* (0.05 * mean(q[96 * (day - 1) + i, load]))
-        end
+        # for i in 1:96
+        #     p[96 * (day - 1) + i, load] = p[96 * (day - 1) + i, load] .+ rand(-1:1) .* (0.05 * mean(p[96 * (day - 1) + i, load]))
+        #     q[96 * (day - 1) + i, load] = q[96 * (day - 1) + i, load] .+ rand(-1:1) .* (0.05 * mean(q[96 * (day - 1) + i, load]))
+        # end
 
         count = count + 1
         normalized_p_values = p[96 * (day - 1) + 1 : 96 * (day - 1) + 96, load] ./ maximum(p[96 * (day - 1) + 1 : 96 * (day - 1) + 96, load]) 
