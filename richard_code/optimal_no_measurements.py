@@ -36,7 +36,7 @@ with open('one_hot_vector.json') as f:
     one_hot_vector = [x - 1 for x in one_hot_vector]
 
 # Specify the path to your .mat file
-file_path = "/Users/rasiamah3/Library/CloudStorage/OneDrive-GeorgiaInstituteofTechnology/Research/Just Code/JuliaDevelopment/smart_meter_data/voltage_control_data.mat"
+file_path = "/Users/rasiamah3/Library/CloudStorage/OneDrive-GeorgiaInstituteofTechnology/Research/just_code/JuliaDevelopment/smart_meter_data/voltage_control_data.mat"
 
 # Load the data from the .mat file
 data = mat73.loadmat(file_path)
@@ -130,10 +130,11 @@ plt.show()
 
 # Plotting accuracy vs timesteps
 plt.figure(figsize=(8, 6))
-plt.plot(all_timesteps, accuracy_values, marker='o')
+plt.plot(all_timesteps, accuracy_values, marker='*', color='red')
 plt.xlabel('Timesteps')
 plt.ylabel('Accuracy')
 plt.title('Accuracy VS Number of Timesteps')
+plt.grid(True)
 plt.savefig('accuracy_vs_timesteps.png')
 plt.show()
 
